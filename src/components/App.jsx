@@ -4,18 +4,69 @@ import Note from "./Note";
 import Header from "./Header";
 import Footer from "./Footer";
 
+// Generate unique IDs for notes and items
+function generateId() {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
 function App() {
-  const [notes, setNotes] = useState([]);
+  const [notes, setNotes] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("notes")) || [];
+    } catch (error) {
+      console.log('Failed to read earlier notes.', error);
+      return [];
+    }
+  });
 
   function addNote(newNote) {
     setNotes((prevNotes) => {
-      return [...prevNotes, newNote];
+      // Convert content to items array (split by line breaks)
+      const items = newNote.content
+        .split('\n')
+        .filter(item => item.trim() !== '')
+        .map(text => ({
+          id: generateId(),
+          text,
+          completed: false
+        }));
+
+      const noteWithItems = {
+        id: generateId(),
+        title: newNote.title,
+        items: items
+      };
+
+      const notes = [...prevNotes, noteWithItems];
+      localStorage.setItem("notes", JSON.stringify(notes));
+      return notes;
     });
   }
 
-  function deleteNote(id) {
+  function deleteNote(noteId) {
     setNotes((prevNotes) => {
-      return prevNotes.filter((note, index) => index !== id);
+      const notes = prevNotes.filter(note => note.id !== noteId);
+      localStorage.setItem("notes", JSON.stringify(notes));
+      return notes;
+    });
+  }
+
+  function toggleComplete(noteId, itemId) {
+    setNotes((prevNotes) => {
+      const notes = prevNotes.map(note => {
+        // Skip notes that aren't the target
+        if (note.id !== noteId) return note;
+
+        // Toggle the specific item's completed state
+        const updatedItems = note.items.map(item =>
+          item.id === itemId ? { ...item, completed: !item.completed } : item
+        );
+
+        return { ...note, items: updatedItems };
+      });
+
+      localStorage.setItem("notes", JSON.stringify(notes));
+      return notes;
     });
   }
 
@@ -23,17 +74,16 @@ function App() {
     <div>
       <Header />
       <CreateArea onAdd={addNote} />
-      {notes.map((note, index) => {
-        return (
-          <Note
-            key={index}
-            id={index}
-            title={note.title}
-            content={note.content}
-            onDelete={deleteNote}
-          />
-        );
-      })}
+      {notes.map((note) => (
+        <Note
+          key={note.id}
+          id={note.id}
+          title={note.title}
+          items={note.items || []}
+          onDelete={deleteNote}
+          onToggle={toggleComplete}
+        />
+      ))}
       <Footer />
     </div>
   );
